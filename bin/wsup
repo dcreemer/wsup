@@ -25,7 +25,7 @@ REPO_PREFIX="git@github.com:${REPO_USER}"
 WSUP_BOOT="https://raw.githubusercontent.com/${REPO_USER}/wsup/master/bin/wsup"
 
 # files to ignore
-IGNORE_RE="(\.git)|(\.gitignore)|(\.wsup)|([Rr][Ee][Aa][Dd][Mm][Ee].*)|(LICENSE)"
+IGNORE_RE="(^\.git$)|(^\.gitignore$)|(^\.wsup$)|(^[Rr][Ee][Aa][Dd][Mm][Ee].*)|(^LICENSE.*)"
 
 # default repo name for the 'dotfiles' repository
 BASE_TARGET="dotfiles"
