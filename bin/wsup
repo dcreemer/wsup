@@ -47,7 +47,10 @@ REPO=""
 CMD=""
 
 # list of all legal commands
-commands="help add list link unlink verify boot"
+commands="help add list link unlink boot"
+
+# result of verification
+VERIFY=0
 
 # final error code
 ERR=0
@@ -303,6 +306,13 @@ unlink_target()
     link_target_inner $1 "del"
 }
 
+verify_target()
+{
+    local target=$1
+    VERIFY=0
+    link_target_inner $1 "verify"
+}
+
 link_target_inner()
 {
     local target=$1
@@ -378,6 +388,27 @@ del_symlink()
     if [[ -h "$targ" ]]; then
         rm -f $targ
         log 1 "$target" "unlink $targ"
+    fi
+}
+
+verify_symlink()
+{
+    # verify symlink is correct
+    target=$1
+    src=$2
+    targ=$3
+    if [[ ! -e "$targ" ]]; then
+        log 0 "$target" "$targ does not exist"
+        VERIFY=-1
+    elif [[ ! -h "$targ" ]]; then
+        log 0 "$target" "$targ is not a link"
+        VERIFY=-1
+    else
+        t=$(readlink $targ)
+        if [[ "$t" != "$src" ]]; then
+            log 0 "$target" "verify $targ link is incorrect"
+            VERIFY=-1
+        fi
     fi
 }
 
@@ -500,38 +531,12 @@ link_one()
 }
 
 ##
-## verify command -- check to ensure all known targets are install correctly
-##
-
-command_verify()
-{
-    if [[ $# -gt 0 ]]; then
-        for t in $@; do
-            verify_one $t
-        done
-    else
-        map_targets verify_one
-    fi
-}
-
-verify_one()
-{
-    local target=$1
-    local repo=$2
-    if [[ -d "${WD}/${target}" ]]; then
-        log 1 $target "verify"
-    else
-        log 1 $target "not installed"
-    fi
-}
-
-##
 ## list command -- list all known targets, both installed and not
 ##
 
 command_list()
 {
-    echo "TARGET           I REPOSITORY"
+    echo "TARGET           S REPOSITORY"
     echo "---------------- - --------------------------------------------------------------------"
     map_targets "print_target_info"
 }
@@ -540,14 +545,19 @@ print_target_info()
 {
     local target=$1
     local r=$2
-    local installed=" "
+    local status=" "
     if [[ -d "${WD}/${target}" ]]; then
-        installed="*"
+        verify_target $target
+        if [[ $VERIFY -eq 0 ]]; then
+            status="*"
+        else
+            status="!"
+        fi
     fi
     if [[ "$r" == "" ]]; then
         r="<unknown>"
     fi
-    printf "%-16s %s %s\n" "${target}" "$installed" "$r"
+    printf "%-16s %s %s\n" "${target}" "$status" "$r"
 }
 
 ##
@@ -607,7 +617,7 @@ if [[ $# == 0 ]]; then
         # but we are being asked to bootup or there is no existing $HOME/.wsup/wsup dir
         CMD="boot"
     else
-        CMD="verify"
+        CMD="list"
     fi
 else
     CMD=$1
