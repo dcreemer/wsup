@@ -19,7 +19,7 @@ WD="$HOME/.wsup"
 REPO_USER=${USER}
 
 # default URL prefix for repos:
-REPO_PREFIX="https://github.com/${REPO_USER}"
+REPO_PREFIX="git@github.com:${REPO_USER}"
 
 # where to find the bootup wsup dir
 WSUP_BOOT="https://raw.githubusercontent.com/${REPO_USER}/wsup/master/bin/wsup"
@@ -27,7 +27,7 @@ WSUP_BOOT="https://raw.githubusercontent.com/${REPO_USER}/wsup/master/bin/wsup"
 # files to ignore
 IGNORE_RE="(\.git)|(\.gitignore)|(\.wsup)|([Rr][Ee][Aa][Dd][Mm][Ee].*)|(LICENSE)"
 
-# default repo name for the 'base' repository
+# default repo name for the 'dotfiles' repository
 BASE_TARGET="dotfiles"
 
 ##
@@ -163,10 +163,10 @@ scan_targets()
         fi
     done
     # if there is no base repo, add the default:
-    get_target "base"
+    get_target $BASE_TARGET
     if [[ $REPO == "" ]]; then
-        add_target "base" "${REPO_PREFIX}/${BASE_TARGET}"
-        get_target "base"
+        add_target $BASE_TARGET "${REPO_PREFIX}/${BASE_TARGET}.git"
+        get_target $BASE_TARGET
     fi
 }
 
