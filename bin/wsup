@@ -39,7 +39,10 @@ VERBOSE=1
 CMD=""
 
 # list of all legal commands
-commands="add remove help list link wsup"
+commands="help add list link unlink verify wsup"
+
+# final error code
+ERR=0
 
 ##
 ## logging
@@ -48,10 +51,22 @@ commands="add remove help list link wsup"
 log()
 {
     local lvl=$1
-    local cmd=$2
+    local targ=$2
     shift 2
+    local msg=$*
     if [[ "$lvl" -ge "$VERBOSE" ]]; then
-        printf "[%6s] %s\n" "$cmd" "$*"
+        if [[ "$targ" == "" ]]; then
+            targ="----------------"
+        fi
+        printf "[%16s] %s\n" "$targ" "$msg"
+    fi
+}
+
+seterr()
+{
+    local code=$1
+    if [[ $ERR -eq 0 ]]; then
+        ERR=$code
     fi
 }
 
@@ -62,14 +77,14 @@ log()
 read_configs()
 {
     if [[ -r "$HOME/.wsup/config" ]]; then
-        log 0 "CONFIG" "reading $HOME/.wsup/config"
+        log 0 "" "reading $HOME/.wsup/config"
         . "$HOME/.wsup/config"
     fi
     local targs=$(/bin/ls -A ${WD})
     for t in $targs; do
         local tc="${WD}/${t}/.wsup/config"
         if [[ -r "$tc" ]]; then
-            log 0 "CONFIG" "reading ${tc}"
+            log 0 "" "reading ${tc}"
             . "$tc"
         fi
     done
@@ -85,7 +100,7 @@ add_target()
     local k=$1
     local v=$2
     REPOS[${#REPOS[@]}]="${k} __ ${v}"
-    log 0 "TARGET" "adding alias $k => $v"
+    log 0 "$k" "adding target $v"
 }
 
 get_target()
@@ -111,8 +126,10 @@ scan_targets()
                 # found a target -- get the remote (if any)
                 if [[ -d "${tc}/.git" ]]; then
                     repo=`cd ${tc}; git remote -v | grep fetch | awk '{print $2}'`
-                    add_target $t "$repo"
+                else
+                    repo=""
                 fi
+                add_target $t "$repo"
             fi
         fi
     done
@@ -128,10 +145,11 @@ scan_targets()
 map_targets()
 {
     local fn=$1
+    shift
     for pair in "${REPOS[@]}" ; do
         local t="${pair%% __ *}"
         if [[ "$t" != "...x..." ]]; then
-            $fn "$t"
+            $fn "$t" "$*"
         fi
     done
 }
@@ -200,11 +218,11 @@ fetch_repo()
     if [[ ! -r $target_dir ]]; then
         get_target $target
         if [[ "$REPO" != "" ]]; then
-            log 1 "CLONE" "$REPO -> $target"
+            log 1 "$target" "cloning $REPO"
             git clone $REPO $target_dir
         else
-            log 1 "CLONE" "unknown target: $target"
-            exit -1
+            log 1 "$target" "target unknown"
+            seterr -1
         fi
     fi
 }
@@ -216,10 +234,10 @@ fetch_repo()
 link_target()
 {
     local target=$1
-    log 1 "LINK" "$target"
-    link_dir "${WD}/$target" "$HOME" 1
-    if [[ -d "${WD/$target/.wsup/${OS}}" ]]; then
-        link_dir "${WD}/$target/.wsup/${OS}" "$HOME" 1
+    link_dir $target "${WD}/$target" "$HOME" 1
+    local osdir="${WD}/$target/.wsup/${OS}"
+    if [[ -e "$osdir" && -d "$osdir" ]]; then
+        link_dir $target "$osdir" "$HOME" 1
     fi
 }
 
@@ -227,20 +245,21 @@ link_dir()
 {
     # link all of the files in the target directory to $HOME. Regular files are linked directly,
     # directories files are first made in the home directory, then linked from within
-    local source_dir=$1
-    local dest_dir=$2
-    local recur=$3
+    local target=$1
+    local source_dir=$2
+    local dest_dir=$3
+    local recur=$4
     local files=$(/bin/ls -A ${source_dir})
     if [[ ! -d "${dest_dir}" ]]; then
-        log 0 "MKDIR" "$dest_dir"
+        log 0 "" "mkdir $dest_dir"
         mkdir -p "${dest_dir}"
     fi
     for src_f in $files; do
         if [[ ! "$src_f" =~ $IGNORE_RE ]]; then
             if [[ -d "${source_dir}/${src_f}" && $recur -eq 1 ]]; then
-                link_dir "${source_dir}/${src_f}" "${dest_dir}/${src_f}" 0
+                link_dir $target "${source_dir}/${src_f}" "${dest_dir}/${src_f}" 0
             else
-                symlink "${source_dir}/${src_f}" "${dest_dir}/${src_f}"
+                symlink $target "${source_dir}/${src_f}" "${dest_dir}/${src_f}"
             fi
         fi
     done
@@ -248,9 +267,10 @@ link_dir()
  
 symlink()
 {
-    src=$1
-    targ=$2
-    log 0 "CHECK" "$targ -> $src"
+    target=$1
+    src=$2
+    targ=$3
+    log 0 "$target" "link $targ -> $src"
     # if we have a good source, target
     if [ ! -z "$src" ] && [ ! -z "$targ" ]; then
         if [ ! -h $targ ]; then
@@ -260,7 +280,7 @@ symlink()
                 rm -rf $targ
             fi
             # and symlink it
-            log 1 "LINK" "$src"
+            log 1 "$target" "link $src"
             ln -s $src $targ
         fi
     fi
@@ -275,7 +295,7 @@ run_postinstall()
     # if target has a postinstall script, run it
     local script="${WD}/$1/.wsup/postinstall"
     if [[ -x "$script" ]]; then
-        log 1 "EXEC" $script
+        log 1 $1 "exec $script"
         $script
     fi
 }
@@ -293,21 +313,39 @@ execute_command()
     else
         echo "command \"$cmd\" unknown"
         command_help
-        exit -1
+        seterr -1
     fi
 }
 
+##
+## add command -- fetch the named target and then link
+##
+
 command_add()
 {
-    fetch_repo $1
-    link_target $1
-    run_postinstall $1
+    local target=$1
+    log 1 $target "start add"
+    fetch_repo $target
+    link_target $target
+    run_postinstall $target
+    log 1 $target "end add"
 }
 
-command_remove()
+##
+## unlink command -- remove the links from the given target (but do not remove the target)
+##
+
+command_unlink()
 {
-    log 0 "REMOVE" "<tbd>"
+    local target=$1
+    log 1 $target "start unlink"
+    log 0 $target "unlink <tbd>"
+    log 1 $target "end unlink"
 }
+
+##
+## link command -- link all files and dirs in the given target(s)
+##
 
 command_link()
 {
@@ -316,16 +354,46 @@ command_link()
             link_one $t
         done
     else
-        map_targets link_one
+        map_targets link_one "noerr"
     fi
 }
 
 link_one()
 {
     local target=$1
+    shift
+    local noerr=$*
     if [[ -d "${WD}/${target}" ]]; then
-        link_target $1
-        run_postinstall $1
+        link_target $target
+        run_postinstall $target
+    elif [[ "$noerr" == "" ]]; then
+        log 1 $target "unknown"
+        seterr -1
+    fi
+}
+
+##
+## verify command -- check to ensure all known targets are install correctly
+##
+
+command_verify()
+{
+    if [[ $# -gt 0 ]]; then
+        for t in $@; do
+            verify_one $t
+        done
+    else
+        map_targets verify_one
+    fi
+}
+
+verify_one()
+{
+    local target=$1
+    if [[ -d "${WD}/${target}" ]]; then
+        log 1 $target "verify"
+    else
+        log 1 $target "not installed"
     fi
 }
 
@@ -361,7 +429,7 @@ print_target_info()
 
 command_wsup()
 {
-    log 0 "WSUP" "<tbd>"
+    log 0 "" "wsup <tbd>"
 }
 
 command_help()
@@ -389,17 +457,22 @@ while getopts "v" opt; do
 done
 shift $((OPTIND - 1))
 
-# parse command argument and execute it
+# parse command argument
 if [[ $# == 0 ]]; then
-    CMD="link"
+    CMD="verify"
 else
     CMD=$1
     shift
 fi
 
-# main program
-log 1 "START"
+# read in all configuration files
 read_configs
+
+# scan to be sure we have all known targets
 scan_targets
+
+# execute the given command and return status:
 execute_command $CMD $@
-log 1 "DONE"
+if [[ $ERR -ne 0 ]]; then
+    exit $ERR
+fi
