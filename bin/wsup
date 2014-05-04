@@ -100,30 +100,39 @@ get_target()
     done
 }
 
-map_targets()
+scan_targets()
 {
-    local fn=$1
-    local targets=""
-    for pair in "${REPOS[@]}" ; do
-        local t="${pair%% __ *}"
-        if [[ "$t" != "...x..." ]]; then
-            targets="$targets $t"
-        fi
-    done
-    # look for targets on disk but not in alias list
+    # look for targets on disk but not pre-added to the targets list
     for t in $(/bin/ls -A ${WD}); do
         local tc="${WD}/${t}/"
         if [[ -d "$tc" ]]; then
             get_target $t
             if [[ "$REPO" == "" ]]; then
-                targets="$targets $t"
+                # found a target -- get the remote (if any)
+                if [[ -d "${tc}/.git" ]]; then
+                    repo=`cd ${tc}; git remote -v | grep fetch | awk '{print $2}'`
+                    add_target $t "$repo"
+                fi
             fi
         fi
     done
-    # apply the function to all targets
-    for target in $targets ; do
-        get_target $target
-        $fn "$target" "$REPO"
+    # if there is no base repo, add the default:
+    get_target "base"
+    if [[ $REPO == "" ]]; then
+        add_target "base" "${REPO_PREFIX}/${BASE_TARGET}"
+        get_target "base"
+    fi
+}
+
+
+map_targets()
+{
+    local fn=$1
+    for pair in "${REPOS[@]}" ; do
+        local t="${pair%% __ *}"
+        if [[ "$t" != "...x..." ]]; then
+            $fn "$t"
+        fi
     done
 }
 
@@ -271,16 +280,6 @@ run_postinstall()
     fi
 }
 
-set_defaults()
-{
-    # if there is no base repo, add the default:
-    get_target "base"
-    if [[ $REPO == "" ]]; then
-        add_target "base" "${REPO_PREFIX}/${BASE_TARGET}"
-        get_target "base"
-    fi
-}
-
 ##
 ## top-level commands
 ##
@@ -301,6 +300,8 @@ execute_command()
 command_add()
 {
     fetch_repo $1
+    link_target $1
+    run_postinstall $1
 }
 
 command_remove()
@@ -310,8 +311,22 @@ command_remove()
 
 command_link()
 {
-    link_target $1
-    run_postinstall $1
+    if [[ $# -gt 0 ]]; then
+        for t in $@; do
+            link_one $t
+        done
+    else
+        map_targets link_one
+    fi
+}
+
+link_one()
+{
+    local target=$1
+    if [[ -d "${WD}/${target}" ]]; then
+        link_target $1
+        run_postinstall $1
+    fi
 }
 
 ##
@@ -328,15 +343,16 @@ command_list()
 print_target_info()
 {
     local target=$1
-    local repo=$2
+    get_target $target
+    local r="$REPO"
     local installed=" "
     if [[ -d "${WD}/${target}" ]]; then
         installed="*"
     fi
-    if [[ "$repo" == "" ]]; then
-        repo="<unknown>"
+    if [[ "$r" == "" ]]; then
+        r="<unknown>"
     fi
-    printf "%-16s %s %s\n" "${target}" "$installed" "$repo"
+    printf "%-16s %s %s\n" "${target}" "$installed" "$r"
 }
 
 ##
@@ -384,6 +400,6 @@ fi
 # main program
 log 1 "START"
 read_configs
-set_defaults
+scan_targets
 execute_command $CMD $@
 log 1 "DONE"
