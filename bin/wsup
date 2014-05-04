@@ -27,7 +27,7 @@ IGNORE_RE="(\.git)|(\.gitignore)|(\.wsup)|([Rr][Ee][Aa][Dd][Mm][Ee].*)|(LICENSE)
 BASE_TARGET="dotfiles"
 
 # the "map" of target => git repos URLs
-REPOS=("...x... __ ...x...")
+declare -a REPOS=( "xxx __ yyy" )
 
 # the repository on which we are currently operating
 REPO=""
@@ -106,8 +106,13 @@ add_target()
     # add k = v to REPOS map
     local k=$1
     local v=$2
-    REPOS[${#REPOS[@]}]="${k} __ ${v}"
-    log 0 "$k" "adding target $v"
+    get_target $k
+    if [[ "$REPO" == "" ]]; then
+        REPOS[${#REPOS[@]}]="${k} __ ${v}"
+        log 0 "$k" "adding target $v"
+    elif [[ "$v" != "$REPO" ]]; then
+        log 1 "$k" "error: target added with $REPO and $v"
+    fi
 }
 
 get_target()
@@ -115,11 +120,17 @@ get_target()
     # given a target name, fetch the target repo
     local target=$1
     REPO=""
-    for pair in "${REPOS[@]}" ; do
-        if [[ $target == "${pair%% __ *}" ]]; then
-            REPO="${pair##* __ }"
-        fi
-    done
+    map_targets get_one_target $target
+}
+
+get_one_target()
+{
+    local target=$1
+    local r=$2
+    local cand=$3
+    if [[ "$target" == "$cand" ]]; then
+       REPO=$r
+    fi
 }
 
 scan_targets()
@@ -153,11 +164,16 @@ map_targets()
 {
     local fn=$1
     shift
-    for pair in "${REPOS[@]}" ; do
+    local count=${#REPOS[@]}
+    local idx=0
+    while [[ $idx -lt $count ]]; do
+        pair=${REPOS[$idx]}
         local t="${pair%% __ *}"
-        if [[ "$t" != "...x..." ]]; then
-            $fn "$t" "$*"
+        local r="${pair##* __ }"
+        if [[ "$t" != "xxx" ]]; then
+            $fn "$t" "$r" "$*"
         fi
+        ((idx++))
     done
 }
 
@@ -167,24 +183,30 @@ map_targets()
 
 install_package()
 {
-    local pkg=$1
-    case $OS in
-        "Linux")
-            install_apt_pkg $pkg
-            ;;
-        "Darwin")
-            install_brew_pkg $pkg
-            ;;
-        "FreeBSD")
-            install_bsd_pkg $pkg
-            ;;
-    esac
+    local pos=$1
+    shift
+    if [[ "$OS" == "$pos" ]]; then
+        local pkg=$*
+        case $OS in
+            "Linux")
+                install_apt_pkg $pkg
+                ;;
+            "Darwin")
+                install_brew_pkg $pkg
+                ;;
+            "FreeBSD")
+                install_bsd_pkg $pkg
+                ;;
+        esac
+    fi
 }
 
 install_apt_pkg()
 {
     # install an apt-based package (if it doesn't exist)
     local p=$1
+    shift
+    local args=$*
     dpkg -l $p >/dev/null 2>&1
     if [ $? -ne 0 ]; then
         echo "[INSTALL] $p"
@@ -196,9 +218,11 @@ install_brew_pkg()
 {
     # install a brew-based package (if it doesn't exist)
     local p=$1
+    shift
+    local args=$*
     if [ ! -d /usr/local/Cellar/${p} ]; then
         echo "[INSTALL] $p"
-        brew install $p
+        brew install $p $args
     fi
 }
 
@@ -206,6 +230,8 @@ install_bsd_pkg()
 {
     # install a freebsd pkg-based package (if it doesn't exist)
     local p=$1
+    shift
+    local args=$*
     pkg info -e $p
     if [ $? -eq 1 ]; then
         echo "[INSTALL] $p"
@@ -307,7 +333,7 @@ run_postinstall()
     local script="${WD}/$1/.wsup/postinstall"
     if [[ -x "$script" ]]; then
         log 1 $1 "exec $script"
-        $script
+        . $script
         if [[ $? -ne 0 ]]; then
             log 1 $1 "error in $script"
             seterr 1
@@ -367,7 +393,7 @@ command_link()
 {
     if [[ $# -gt 0 ]]; then
         for t in $@; do
-            link_one $t
+            link_one $t ""
         done
     else
         map_targets link_one "noerr"
@@ -377,7 +403,8 @@ command_link()
 link_one()
 {
     local target=$1
-    shift
+    local repo=$2
+    shift 2
     local noerr=$*
     if [[ -d "${WD}/${target}" ]]; then
         link_target $target
@@ -406,6 +433,7 @@ command_verify()
 verify_one()
 {
     local target=$1
+    local repo=$2
     if [[ -d "${WD}/${target}" ]]; then
         log 1 $target "verify"
     else
@@ -427,8 +455,7 @@ command_list()
 print_target_info()
 {
     local target=$1
-    get_target $target
-    local r="$REPO"
+    local r=$2
     local installed=" "
     if [[ -d "${WD}/${target}" ]]; then
         installed="*"
