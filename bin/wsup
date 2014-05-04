@@ -264,11 +264,20 @@ fetch_repo()
     local target_dir=${WD}/$target
     if [[ ! -r $target_dir ]]; then
         get_target $target
+        if [[ "$REPO" == "" ]]; then
+            local r="${REPO_PREFIX}/$target"
+            log 0 $target "testing for existence of $r"
+            curl -IfsSL "$r" > /dev/null 2>&1
+            if [[ $? -eq 0 ]]; then
+                REPO=$r
+                log 0 $target "found $r"
+            fi
+        fi
         if [[ "$REPO" != "" ]]; then
             log 1 "$target" "cloning $REPO"
             git clone $REPO $target_dir
             if [[ $? -ne 0 ]]; then
-                echo $go
+                log 1 "$target" "error cloning $REPO"
                 seterr 2
             fi
         else
@@ -418,12 +427,16 @@ command_add()
         target=`basename $arg`
         target=${target/.git/}
         add_target "$target" "$arg"
+    else
+        target=$arg
     fi
     log 1 $target "start add"
     fetch_repo $target
-    read_one_config $target
-    link_target $target
-    run_postinstall $target
+    if [[ "$ERR" == "0" ]]; then
+        read_one_config $target
+        link_target $target
+        run_postinstall $target
+    fi
     log 1 $target "end add"
 }
 
