@@ -2,8 +2,6 @@
 #
 # WSUP -- Workspace Set UP
 #
-# assumes sudo, bash, and curl
-# 
 
 set -o nounset
 
@@ -39,7 +37,7 @@ VERBOSE=1
 CMD=""
 
 # list of all legal commands
-commands="help add list link unlink verify wsup"
+commands="help add list link unlink verify"
 
 # final error code
 ERR=0
@@ -208,9 +206,11 @@ install_apt_pkg()
     shift
     local args=$*
     dpkg -l $p >/dev/null 2>&1
-    if [ $? -ne 0 ]; then
-        echo "[INSTALL] $p"
+    if [[ $? -ne 0 ]]; then
+        log 1 "" "installing $p"
         sudo apt-get install -y $p
+    else
+        log 0 "" "$p already installed"
     fi
 }
 
@@ -220,9 +220,11 @@ install_brew_pkg()
     local p=$1
     shift
     local args=$*
-    if [ ! -d /usr/local/Cellar/${p} ]; then
-        echo "[INSTALL] $p"
+    if [[ ! -d /usr/local/Cellar/${p} ]]; then
+        log 1 "" "installing $p"
         brew install $p $args
+    else
+        log 0 "" "$p already installed"
     fi
 }
 
@@ -233,9 +235,11 @@ install_bsd_pkg()
     shift
     local args=$*
     pkg info -e $p
-    if [ $? -eq 1 ]; then
-        echo "[INSTALL] $p"
+    if [[ $? -eq 1 ]]; then
+        log 1 "" "installing $p"
         sudo pkg install -U -y $p
+    else
+        log 0 "" "$p already installed"
     fi
 }
 
@@ -271,10 +275,24 @@ fetch_repo()
 link_target()
 {
     local target=$1
-    link_dir $target "${WD}/$target" "$HOME" 1
+    link_target_inner $1 "add"
+}
+
+unlink_target()
+{
+    local target=$1
+    link_target_inner $1 "del"
+}
+
+link_target_inner()
+{
+    local target=$1
+    local action=$2
+    local recur=1
+    link_dir $target "${WD}/$target" "$HOME" $recur $action
     local osdir="${WD}/$target/.wsup/${OS}"
     if [[ -e "$osdir" && -d "$osdir" ]]; then
-        link_dir $target "$osdir" "$HOME" 1
+        link_dir $target "$osdir" "$HOME" $recur $action
     fi
 }
 
@@ -286,33 +304,41 @@ link_dir()
     local source_dir=$2
     local dest_dir=$3
     local recur=$4
+    local action=$5
     local files=$(cd ${source_dir}; ls -A)
-    if [[ ! -d "${dest_dir}" ]]; then
+    if [[ "$action" == "add" && ! -d "${dest_dir}" ]]; then
         log 0 "" "mkdir $dest_dir"
         mkdir -p "${dest_dir}"
     fi
     for src_f in $files; do
         if [[ ! "$src_f" =~ $IGNORE_RE ]]; then
             if [[ -d "${source_dir}/${src_f}" && $recur -eq 1 ]]; then
-                link_dir $target "${source_dir}/${src_f}" "${dest_dir}/${src_f}" 0
+                link_dir $target "${source_dir}/${src_f}" "${dest_dir}/${src_f}" 0 $action
             else
-                symlink $target "${source_dir}/${src_f}" "${dest_dir}/${src_f}"
+                ${action}_symlink $target "${source_dir}/${src_f}" "${dest_dir}/${src_f}"
             fi
         fi
     done
+    if [[ "$action" == "del" && "${dest_dir}" != "${HOME}" && -d "${dest_dir}" ]]; then
+        local files="$(ls -A ${dest_dir})"
+        if [[ "$files" == "" ]]; then
+            log 1 $target "rmdir $dest_dir (empty)"
+            rmdir "${dest_dir}"
+        fi
+    fi
 }
  
-symlink()
+add_symlink()
 {
     target=$1
     src=$2
     targ=$3
     log 0 "$target" "link $targ -> $src"
     # if we have a good source, target
-    if [ ! -z "$src" ] && [ ! -z "$targ" ]; then
-        if [ ! -h $targ ]; then
+    if [[ ! -z "$src" && ! -z "$targ" ]]; then
+        if [[ ! -h $targ ]]; then
             # if it's not a symlink already...
-            if [ -r $targ ]; then
+            if [[ -r $targ ]]; then
                 # but is there, then remove it
                 rm -rf $targ
             fi
@@ -320,6 +346,19 @@ symlink()
             log 1 "$target" "link $src"
             ln -s $src $targ
         fi
+    fi
+}
+
+del_symlink()
+{
+    # unlink if it's a symlink
+    target=$1
+    src=$2
+    targ=$3
+    log 0 "$target" "unlink $targ -> $src"
+    if [[ -h "$targ" ]]; then
+        rm -f $targ
+        log 1 "$target" "unlink $targ"
     fi
 }
 
@@ -332,7 +371,7 @@ run_postinstall()
     # if target has a postinstall script, run it
     local script="${WD}/$1/.wsup/postinstall"
     if [[ -x "$script" ]]; then
-        log 1 $1 "exec $script"
+        log 0 $1 "exec $script"
         . $script
         if [[ $? -ne 0 ]]; then
             log 1 $1 "error in $script"
@@ -379,10 +418,27 @@ command_add()
 
 command_unlink()
 {
+    if [[ $# -gt 0 ]]; then
+        for t in $@; do
+            unlink_one $t ""
+        done
+    else
+        map_targets unlink_one "noerr"
+    fi
+}
+
+unlink_one()
+{
     local target=$1
-    log 1 $target "start unlink"
-    log 0 $target "unlink <tbd>"
-    log 1 $target "end unlink"
+    local repo=$2
+    shift 2
+    local noerr=$*
+    if [[ -d "${WD}/${target}" ]]; then
+        unlink_target $target
+    elif [[ "$noerr" == "" ]]; then
+        log 1 $target "unknown"
+        seterr 1
+    fi
 }
 
 ##
@@ -467,13 +523,8 @@ print_target_info()
 }
 
 ##
-## wsup
+## help command
 ##
-
-command_wsup()
-{
-    log 0 "" "wsup <tbd>"
-}
 
 command_help()
 {
