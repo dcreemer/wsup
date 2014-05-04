@@ -574,11 +574,12 @@ else
     shift
 fi
 
-# read in all configuration files
-read_configs
-
-# scan to be sure we have all known targets
-scan_targets
+if [[ -d "${WD}" ]]; then
+    # read in all configuration files
+    read_configs
+    # scan to be sure we have all known targets
+    scan_targets
+fi
 
 # execute the given command and return status:
 execute_command $CMD $@
