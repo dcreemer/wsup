@@ -1,0 +1,389 @@
+#! /usr/bin/env bash
+#
+# WSUP -- Workspace Set UP
+#
+# assumes sudo, bash, and curl
+# 
+
+set -o nounset
+
+##
+## globals
+##
+
+# operating system name
+OS=`uname -s`
+
+# the WSUP directory
+WD="$HOME/.wsup"
+
+# default URL prefix for repos:
+REPO_PREFIX="https://github.com/${USER}"
+
+# files to ignore
+IGNORE_RE="(\.git)|(\.gitignore)|(\.wsup)|([Rr][Ee][Aa][Dd][Mm][Ee].*)|(LICENSE)"
+
+# default repo suffix for 'base' repository
+BASE_TARGET="dotfiles"
+
+# the "map" of target => git repos URLs
+REPOS=("...x... __ ...x...")
+
+# the repository on which we are currently operating
+REPO=""
+
+# verbosity level; 0==debug, 1 == normal
+VERBOSE=1
+
+# current command
+CMD=""
+
+# list of all legal commands
+commands="add remove help list link wsup"
+
+##
+## logging
+##
+
+log()
+{
+    local lvl=$1
+    local cmd=$2
+    shift 2
+    if [[ "$lvl" -ge "$VERBOSE" ]]; then
+        printf "[%6s] %s\n" "$cmd" "$*"
+    fi
+}
+
+##
+## read configs
+##
+
+read_configs()
+{
+    if [[ -r "$HOME/.wsup/config" ]]; then
+        log 0 "CONFIG" "reading $HOME/.wsup/config"
+        . "$HOME/.wsup/config"
+    fi
+    local targs=$(/bin/ls -A ${WD})
+    for t in $targs; do
+        local tc="${WD}/${t}/.wsup/config"
+        if [[ -r "$tc" ]]; then
+            log 0 "CONFIG" "reading ${tc}"
+            . "$tc"
+        fi
+    done
+}
+
+##
+## target / management
+##
+
+add_target()
+{
+    # add k = v to REPOS map
+    local k=$1
+    local v=$2
+    REPOS[${#REPOS[@]}]="${k} __ ${v}"
+    log 0 "TARGET" "adding alias $k => $v"
+}
+
+get_target()
+{
+    # given a target name, fetch the target repo
+    local target=$1
+    REPO=""
+    for pair in "${REPOS[@]}" ; do
+        if [[ $target == "${pair%% __ *}" ]]; then
+            REPO="${pair##* __ }"
+        fi
+    done
+}
+
+map_targets()
+{
+    local fn=$1
+    local targets=""
+    for pair in "${REPOS[@]}" ; do
+        local t="${pair%% __ *}"
+        if [[ "$t" != "...x..." ]]; then
+            targets="$targets $t"
+        fi
+    done
+    # look for targets on disk but not in alias list
+    for t in $(/bin/ls -A ${WD}); do
+        local tc="${WD}/${t}/"
+        if [[ -d "$tc" ]]; then
+            get_target $t
+            if [[ "$REPO" == "" ]]; then
+                targets="$targets $t"
+            fi
+        fi
+    done
+    # apply the function to all targets
+    for target in $targets ; do
+        get_target $target
+        $fn "$target" "$REPO"
+    done
+}
+
+##
+## pkg managment
+##
+
+install_package()
+{
+    local pkg=$1
+    case $OS in
+        "Linux")
+            install_apt_pkg $pkg
+            ;;
+        "Darwin")
+            install_brew_pkg $pkg
+            ;;
+        "FreeBSD")
+            install_bsd_pkg $pkg
+            ;;
+    esac
+}
+
+install_apt_pkg()
+{
+    # install an apt-based package (if it doesn't exist)
+    local p=$1
+    dpkg -l $p >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        echo "[INSTALL] $p"
+        sudo apt-get install -y $p
+    fi
+}
+
+install_brew_pkg()
+{
+    # install a brew-based package (if it doesn't exist)
+    local p=$1
+    if [ ! -d /usr/local/Cellar/${p} ]; then
+        echo "[INSTALL] $p"
+        brew install $p
+    fi
+}
+
+install_bsd_pkg()
+{
+    # install a freebsd pkg-based package (if it doesn't exist)
+    local p=$1
+    pkg info -e $p
+    if [ $? -eq 1 ]; then
+        echo "[INSTALL] $p"
+        sudo pkg install -U -y $p
+    fi
+}
+
+##
+## repos
+##
+
+fetch_repo()
+{
+    # given a target name, fetch the repository 
+    local target=$1
+    local target_dir=${WD}/$target
+    if [[ ! -r $target_dir ]]; then
+        get_target $target
+        if [[ "$REPO" != "" ]]; then
+            log 1 "CLONE" "$REPO -> $target"
+            git clone $REPO $target_dir
+        else
+            log 1 "CLONE" "unknown target: $target"
+            exit -1
+        fi
+    fi
+}
+
+##
+## linking files into place
+##
+
+link_target()
+{
+    local target=$1
+    log 1 "LINK" "$target"
+    link_dir "${WD}/$target" "$HOME" 1
+    if [[ -d "${WD/$target/.wsup/${OS}}" ]]; then
+        link_dir "${WD}/$target/.wsup/${OS}" "$HOME" 1
+    fi
+}
+
+link_dir()
+{
+    # link all of the files in the target directory to $HOME. Regular files are linked directly,
+    # directories files are first made in the home directory, then linked from within
+    local source_dir=$1
+    local dest_dir=$2
+    local recur=$3
+    local files=$(/bin/ls -A ${source_dir})
+    if [[ ! -d "${dest_dir}" ]]; then
+        log 0 "MKDIR" "$dest_dir"
+        mkdir -p "${dest_dir}"
+    fi
+    for src_f in $files; do
+        if [[ ! "$src_f" =~ $IGNORE_RE ]]; then
+            if [[ -d "${source_dir}/${src_f}" && $recur -eq 1 ]]; then
+                link_dir "${source_dir}/${src_f}" "${dest_dir}/${src_f}" 0
+            else
+                symlink "${source_dir}/${src_f}" "${dest_dir}/${src_f}"
+            fi
+        fi
+    done
+}
+ 
+symlink()
+{
+    src=$1
+    targ=$2
+    log 0 "CHECK" "$targ -> $src"
+    # if we have a good source, target
+    if [ ! -z "$src" ] && [ ! -z "$targ" ]; then
+        if [ ! -h $targ ]; then
+            # if it's not a symlink already...
+            if [ -r $targ ]; then
+                # but is there, then remove it
+                rm -rf $targ
+            fi
+            # and symlink it
+            log 1 "LINK" "$src"
+            ln -s $src $targ
+        fi
+    fi
+}
+
+##
+## installation
+##
+
+run_postinstall()
+{
+    # if target has a postinstall script, run it
+    local script="${WD}/$1/.wsup/postinstall"
+    if [[ -x "$script" ]]; then
+        log 1 "EXEC" $script
+        $script
+    fi
+}
+
+set_defaults()
+{
+    # if there is no base repo, add the default:
+    get_target "base"
+    if [[ $REPO == "" ]]; then
+        add_target "base" "${REPO_PREFIX}/${BASE_TARGET}"
+        get_target "base"
+    fi
+}
+
+##
+## top-level commands
+##
+
+execute_command()
+{
+    local cmd=$1
+    shift
+    if [[ $commands =~ $cmd ]]; then
+        command_$cmd $@
+    else
+        echo "command \"$cmd\" unknown"
+        command_help
+        exit -1
+    fi
+}
+
+command_add()
+{
+    fetch_repo $1
+}
+
+command_remove()
+{
+    log 0 "REMOVE" "<tbd>"
+}
+
+command_link()
+{
+    link_target $1
+    run_postinstall $1
+}
+
+##
+## list command -- list all known targets, both installed and not
+##
+
+command_list()
+{
+    echo "TARGET           I REPOSITORY"
+    echo "---------------- - --------------------------------------------------------------------"
+    map_targets "print_target_info"
+}
+
+print_target_info()
+{
+    local target=$1
+    local repo=$2
+    local installed=" "
+    if [[ -d "${WD}/${target}" ]]; then
+        installed="*"
+    fi
+    if [[ "$repo" == "" ]]; then
+        repo="<unknown>"
+    fi
+    printf "%-16s %s %s\n" "${target}" "$installed" "$repo"
+}
+
+##
+## wsup
+##
+
+command_wsup()
+{
+    log 0 "WSUP" "<tbd>"
+}
+
+command_help()
+{
+    echo ""
+    echo "this is the help"
+    echo ""
+}
+
+##
+## Main Program
+##
+
+# parse command line options
+while getopts "v" opt; do
+    case $opt in
+        v)
+            VERBOSE=0
+            ;;
+        *)
+            command_help
+            exit -1
+            ;;
+    esac
+done
+shift $((OPTIND - 1))
+
+# parse command argument and execute it
+if [[ $# == 0 ]]; then
+    CMD="link"
+else
+    CMD=$1
+    shift
+fi
+
+# main program
+log 1 "START"
+read_configs
+set_defaults
+execute_command $CMD $@
+log 1 "DONE"
