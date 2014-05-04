@@ -37,7 +37,7 @@ VERBOSE=1
 CMD=""
 
 # list of all legal commands
-commands="help add list link unlink verify"
+commands="help add list link unlink verify boot"
 
 # final error code
 ERR=0
@@ -523,6 +523,15 @@ print_target_info()
 }
 
 ##
+## boot command
+##
+
+command_boot()
+{
+    echo "bootup!"
+}
+
+##
 ## help command
 ##
 
@@ -553,7 +562,13 @@ shift $((OPTIND - 1))
 
 # parse command argument
 if [[ $# == 0 ]]; then
-    CMD="verify"
+    # if no command...
+    if [[ "${BOOT:=no}" = "yes" || ! -r "${WD}/wsup" ]]; then
+        # but we are being asked to bootup or there is no existing $HOME/.wsup/wsup dir
+        CMD="boot"
+    else
+        CMD="verify"
+    fi
 else
     CMD=$1
     shift
