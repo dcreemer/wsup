@@ -76,18 +76,25 @@ seterr()
 
 read_configs()
 {
+    # read base configuration file
     if [[ -r "$HOME/.wsup/config" ]]; then
         log 0 "" "reading $HOME/.wsup/config"
         . "$HOME/.wsup/config"
     fi
-    local targs=$(/bin/ls -A ${WD})
-    for t in $targs; do
-        local tc="${WD}/${t}/.wsup/config"
-        if [[ -r "$tc" ]]; then
-            log 0 "" "reading ${tc}"
-            . "$tc"
-        fi
+    # read all target-specific configurations
+    for t in $(cd ${WD}; ls -A); do
+        read_one_config $t
     done
+}
+
+read_one_config()
+{
+    local target=$1
+    local tc="${WD}/${target}/.wsup/config"
+    if [[ -r "$tc" ]]; then
+        log 0 "$target" "reading ${tc}"
+        . "$tc"
+    fi
 }
 
 ##
@@ -118,7 +125,7 @@ get_target()
 scan_targets()
 {
     # look for targets on disk but not pre-added to the targets list
-    for t in $(/bin/ls -A ${WD}); do
+    for t in $(cd ${WD}; ls -A); do
         local tc="${WD}/${t}/"
         if [[ -d "$tc" ]]; then
             get_target $t
@@ -220,9 +227,13 @@ fetch_repo()
         if [[ "$REPO" != "" ]]; then
             log 1 "$target" "cloning $REPO"
             git clone $REPO $target_dir
+            if [[ $? -ne 0 ]]; then
+                echo $go
+                seterr 2
+            fi
         else
             log 1 "$target" "target unknown"
-            seterr -1
+            seterr 1
         fi
     fi
 }
@@ -249,7 +260,7 @@ link_dir()
     local source_dir=$2
     local dest_dir=$3
     local recur=$4
-    local files=$(/bin/ls -A ${source_dir})
+    local files=$(cd ${source_dir}; ls -A)
     if [[ ! -d "${dest_dir}" ]]; then
         log 0 "" "mkdir $dest_dir"
         mkdir -p "${dest_dir}"
@@ -297,6 +308,10 @@ run_postinstall()
     if [[ -x "$script" ]]; then
         log 1 $1 "exec $script"
         $script
+        if [[ $? -ne 0 ]]; then
+            log 1 $1 "error in $script"
+            seterr 1
+        fi
     fi
 }
 
@@ -326,6 +341,7 @@ command_add()
     local target=$1
     log 1 $target "start add"
     fetch_repo $target
+    read_one_config $target
     link_target $target
     run_postinstall $target
     log 1 $target "end add"
@@ -368,7 +384,7 @@ link_one()
         run_postinstall $target
     elif [[ "$noerr" == "" ]]; then
         log 1 $target "unknown"
-        seterr -1
+        seterr 1
     fi
 }
 
