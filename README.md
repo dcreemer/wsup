@@ -147,7 +147,9 @@ In the default configuration, ```wsup``` ignores (does not link into $HOME) any 
 files that match the ```IGNORE_RE``` regular expression. This is used to excluded files and
 directories such as ````.git````, ```README.md```, etc. The default IGNORE_RE is:
 
-```(^\.git$)|(^\.gitignore$)|(^\.wsup$)|(^[Rr][Ee][Aa][Dd][Mm][Ee].*)|(^LICENSE.*)```
+```
+(^\.git$)|(^\.gitignore$)|(^\.wsup$)|(^[Rr][Ee][Aa][Dd][Mm][Ee].*)|(^LICENSE.*)
+```
 
 ### Target Configuration Files ###
 
