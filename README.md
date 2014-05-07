@@ -189,20 +189,14 @@ fi
 
 ### OS Specific Directories ###
 
-If ```wsup``` 
-```~/.wsup/<target>/.wsup/Darwin```
-
-known ```uname -s``` systems:
+If a ```~/.wsup/<target>/.wsup/<OS>``` directory exists, where ```<OS>``` is one of
 
 - Darwin
 - Linux
 - FreeBSD
 
-## Configuration Files ##
-
-```.wsup/config``` and ```~/.wsup/<target>/.wsup/config```
-
-```~/.wsup/<target>/.wsup/postinstall```
+then files in that directory will be linked by ```wsup``` on the appropriate operating system
+(as determined by ```uname -s```).
 
 ## Bootstrap ##
 
