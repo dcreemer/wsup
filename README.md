@@ -212,3 +212,19 @@ The .../dotfiles/.wsup/config file includes several ```add_target``` commands to
 installation of further private ```wsup``` repositories.
 
 (This assumes curl, bash, and git are already installed).
+
+## See Also ##
+
+Both my [personal dotfiles](https://github.com/dcreemer/dotfiles) and
+[emacs configuration](https://github.com/dcreemer/dotemacs) are managed using wsup and have
+examples of directory layout and configuration.
+
+## Credits ##
+
+Ideas for ```wsup``` can from many places, including:
+
+- https://github.com/technomancy/dotfiles
+- https://github.com/tobias/dotfiles
+- http://errtheblog.com/posts/89-huba-huba
+
+Also thanks to (@mattyblair)[https://twitter.com/mattyblair] for review and comments.
