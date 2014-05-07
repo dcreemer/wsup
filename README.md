@@ -227,4 +227,4 @@ Ideas for ```wsup``` can from many places, including:
 - https://github.com/tobias/dotfiles
 - http://errtheblog.com/posts/89-huba-huba
 
-Also thanks to (@mattyblair)[https://twitter.com/mattyblair] for review and comments.
+Also thanks to [@mattyblair](https://twitter.com/mattyblair) for review and comments.
