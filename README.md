@@ -149,6 +149,9 @@ directories such as ````.git````, ```README.md```, etc. The default IGNORE_RE is
 (^\.git$)|(^\.gitignore$)|(^\.wsup$)|(^[Rr][Ee][Aa][Dd][Mm][Ee].*)|(^LICENSE.*)
 ```
 
+Config files also understand ```add_target <name> <git-clone-url>``` commands -- use this to
+add named wsup repositories to be added later.
+
 ### Target Configuration Files ###
 
 In addition to the ```.wsup/config``` file, each target may also include a
@@ -198,4 +201,14 @@ then files in that directory will be linked by ```wsup``` on the appropriate ope
 
 ## Bootstrap ##
 
-Assumes curl bash, git, and sudo.
+To bootstrap a completely new OS install, I do this:
+
+```
+$ bash <$(https://raw.github.com/dcreemer/wsup/master/bin/wsup)
+$ wsup add dotfiles
+```
+
+The .../dotfiles/.wsup/config file includes several ```add_target``` commands to enable easy
+installation of further private ```wsup``` repositories.
+
+(This assumes curl, bash, and git are already installed).
