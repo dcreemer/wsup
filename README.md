@@ -48,7 +48,7 @@ On your laptop, you can then install both configurations with wsup:
 If your laptop username is "joe" and the wsup configuration is left as the defaults, wsup will
 automatically look for a corresponding user on github.com for targets not specified in URL
 format. Both the default repository site and user can be changed in your local
-configuration. See ".wsup/config" below.
+configuration. See "Configuration Files" below.
 
 ## Commands ##
 
@@ -73,11 +73,18 @@ target's local repository, and so enable or disable the target. For example:
     work             ! https://example.com/joe/work.git
     personal         * git@github.com:joe/personal.git
 
+```wsup link``` and ```wsup unlink``` can be called with multiple targets, or with no targets,
+in which case the command applies to all know targets.
+
+**Important**
+```wsup link``` and ```wsup unlink``` are idempotent -- repeatedly running the same link or
+unlink command is just fine.
+
 ```wsup list``` as show above lists the currently known targets, their corresponding git
 repositories, and the installation status (the "S" column). Here ```*``` indications that the
 target is correctly installed. ```!``` indicates that the target is not, or only partially
 installed, and ``` ``` (blank) means that the target is know, but does not have a local
-repository (see ```add_target``` in the Config File section below).
+repository (see ```add_target``` in the Configiguration Files section below).
 
 Finally ```wsup help``` lists a summary of the available commands.
 
@@ -119,3 +126,82 @@ The resulting home directory structure would be:
        +- work-command -> ~/.wsup/work/bin/work-command
        |
        +- personal-command -> ~/.wsup/personal/bin/personal-command
+
+## Configuration Files ##
+
+Before executing a command, wsup reads the ```.wsup/config``` file, if available, in addition
+to any target-specific configurations files (see below). This file is a bash file that is
+executed in the context of the ```wsup``` script, and is used to customize the ```wsup```
+environment.
+
+Variable      | Default                       | Description
+------------- | -----------                   | -----------
+VERBOSE       | 1                             | set to enable debug output
+WD            | $HOME/.wsup                   | wsup home directory
+REPO_USER     | $USER                         | the name of the account on the git repo site 
+REPO_PREFIX   | "git@github.com:${REPO_USER}" | prefix to use when cloning named targets
+BASE_TARGET   | dotfiles                      | name of the target / repository to automatically add to the targets list as a "base" target
+IGNORE_RE     | <see below>                   | regular expression of repo files to ignore
+
+In the default configuration, ```wsup``` ignores (does not link into $HOME) any repository
+files that match the ```IGNORE_RE``` regular expression. This is used to excluded files and
+directories such as ````.git````, ```README.md```, etc. The default IGNORE_RE is:
+
+```(^\.git$)|(^\.gitignore$)|(^\.wsup$)|(^[Rr][Ee][Aa][Dd][Mm][Ee].*)|(^LICENSE.*)```
+
+### Target Configuration Files ###
+
+In addition to the ```.wsup/config``` file, each target may also include a
+```~/.wsup/<target>/.wsup/config``` file that adds to and overrides the global file. This is
+also just a bash file that is executed just prior to executing ```wsup link``` (or ```wsup
+add```, which calls link). In addition to setting configuration, you can also use the
+```wsup``` built-in ```add_package``` command to install packages. For example:
+
+    install_package "Linux" aspell
+    install_package "FreeBSD" aspell
+    install_package "Darwin" aspell
+
+will install the "aspell" package on Linux, FreeBSD, and Darwin. ```install_package``` uses the
+OS underlying package manager to install the named packages (apt-get, pkg, and brew on Linux,
+FreeBSD, and Mac OS X respectively).
+
+Finally, each target may have a ```~/.wsup/<target>/.wsup/postinstall``` script. This must also
+be a bash script which is executed after a successful link of the named target. One example use
+may be installing additional software:
+
+```bash
+OS=`uname -s`
+if [[ "$OS" == "Darwin" ]]; then
+    if [[ ! -d /Applications/Dropbox.app ]]; then
+        echo "[INSTALL] Dropbox"
+        curl -fsSL "https://www.dropbox.com/download?plat=mac" > ~/Downloads/dropbox.dmg
+        hdiutil attach ~/Downloads/dropbox.dmg
+        SAVEIFS=$IFS
+        IFS=$(echo -en "\n\b")
+        open "/Volumes/Dropbox Installer/Dropbox.app"
+        IFS=$SAVEIFS
+        rm -f ~/Downloads/dropbox.dmg
+    fi
+fi
+```
+
+### OS Specific Directories ###
+
+If ```wsup``` 
+```~/.wsup/<target>/.wsup/Darwin```
+
+known ```uname -s``` systems:
+
+- Darwin
+- Linux
+- FreeBSD
+
+## Configuration Files ##
+
+```.wsup/config``` and ```~/.wsup/<target>/.wsup/config```
+
+```~/.wsup/<target>/.wsup/postinstall```
+
+## Bootstrap ##
+
+Assumes curl bash, git, and sudo.
