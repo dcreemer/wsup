@@ -587,9 +587,18 @@ command_boot()
 
 command_help()
 {
-    echo ""
-    echo "this is the help"
-    echo ""
+cat <<HELP
+usage: wsup [<command>] [target(s)]
+
+wsup help                  - show this help message
+wsup link [target(s)]      - with no arguments, link all known targets. With arguments, link the given target(s)
+wsup unlink [target(s)]    - same as link, but unlink
+wsup add <target> | <url>  - git clone the target or url, then link
+wsup list (or just "wsup") - show status for all known targets
+
+see https://github.com/dcreemer/wsup for detailed documentation
+
+HELP
 }
 
 ##

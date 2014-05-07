@@ -1,8 +1,6 @@
 wsup
 ====
 
-Workspace Set UP. Installs and configures personal configurations by layer
-
 ```wsup``` (pronounced "wassup") is a lightweight package management systems for your shell scripts,
 editor configurations, and general compute environment setup. Using wsup you can go from bare
 OS to a completely personalized and consistent working environment with two or three commands.
