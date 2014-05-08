@@ -208,6 +208,12 @@ $ bash <$(https://raw.github.com/dcreemer/wsup/master/bin/wsup)
 $ wsup add dotfiles
 ```
 
+(on FreeBSD use this instead)
+
+```
+BOOT=yes curl -fsSL https://raw.github.com/dcreemer/wsup/master/bin/wsup | bash
+```
+
 The .../dotfiles/.wsup/config file includes several ```add_target``` commands to enable easy
 installation of further private ```wsup``` repositories.
 
