@@ -194,21 +194,25 @@ map_targets()
 
 install_package()
 {
-    local pos=$1
-    shift
-    if [[ "$OS" == "$pos" ]]; then
-        local pkg=$*
-        case $OS in
-            "Linux")
-                install_apt_pkg $pkg
-                ;;
-            "Darwin")
-                install_brew_pkg $pkg
-                ;;
-            "FreeBSD")
-                install_bsd_pkg $pkg
-                ;;
-        esac
+    # install a package in platform specific way (but only during link
+    # or add phase)
+    if [[ "$CMD" =~ "(link|add)" ]]; then
+        local pos=$1
+        shift
+        if [[ "$OS" == "$pos" ]]; then
+            local pkg=$*
+            case $OS in
+                "Linux")
+                    install_apt_pkg $pkg
+                    ;;
+                "Darwin")
+                    install_brew_pkg $pkg
+                    ;;
+                "FreeBSD")
+                    install_bsd_pkg $pkg
+                    ;;
+            esac
+        fi
     fi
 }
 
