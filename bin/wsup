@@ -482,14 +482,21 @@ execute_command()
 
 command_add()
 {
-    local arg=$1
-    if [[ "$arg" =~ (git@)|(://) ]]; then
-        target=`basename $arg`
-        target=${target/.git/}
-        add_target "$target" "$arg"
-    else
-        target=$arg
-    fi
+    for arg in $@; do
+        if [[ "$arg" =~ (git@)|(://) ]]; then
+            target=`basename $arg`
+            target=${target/.git/}
+            add_target "$target" "$arg"
+        else
+            target=$arg
+        fi
+        add_one $target
+    done
+}
+
+add_one()
+{
+    local target=$1
     log 1 $target "start add"
     fetch_repo $target
     if [[ "$ERR" == "0" ]]; then
