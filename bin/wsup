@@ -40,6 +40,9 @@ OS=`uname -s`
 # the "map" of target => git repos URLs
 declare -a REPOS=( "xxx __ yyy" )
 
+# list of pkgs to install
+declare -a PKGS=( )
+
 # the repository on which we are currently operating
 REPO=""
 
@@ -194,26 +197,30 @@ map_targets()
 
 install_package()
 {
-    # install a package in platform specific way (but only during link
-    # or add phase)
-    if [[ "$CMD" =~ "(link|add)" ]]; then
-        local pos=$1
-        shift
-        if [[ "$OS" == "$pos" ]]; then
-            local pkg=$*
-            case $OS in
-                "Linux")
-                    install_apt_pkg $pkg
-                    ;;
-                "Darwin")
-                    install_brew_pkg $pkg
-                    ;;
-                "FreeBSD")
-                    install_bsd_pkg $pkg
-                    ;;
-            esac
-        fi
-    fi
+    # schedule a package to be installed
+    PKGS[${#PKGS[@]}]="$*"
+}
+
+install_packages()
+{
+    # indicate that we have not done a pkg db update
+    DONE_UPDATE=0
+    idx=0
+    while [[ $idx -lt ${#PKGS[@]} ]]; do
+        local pkg="${PKGS[$idx]}"
+        case $OS in
+            "Linux")
+                install_apt_pkg $pkg
+                ;;
+            "Darwin")
+                install_brew_pkg $pkg
+                ;;
+            "FreeBSD")
+                install_bsd_pkg $pkg
+                ;;
+        esac
+        ((idx++))
+    done
 }
 
 install_apt_pkg()
@@ -224,6 +231,10 @@ install_apt_pkg()
     local args=$*
     dpkg -l $p >/dev/null 2>&1
     if [[ $? -ne 0 ]]; then
+        if [[ $DONE_UPDATE -eq 0 ]]; then
+            sudo apt-get update
+            DONE_UPDATE=1
+        fi
         log 1 "" "installing $p"
         sudo apt-get install -y $p
     else
@@ -238,6 +249,10 @@ install_brew_pkg()
     shift
     local args=$*
     if [[ ! -d /usr/local/Cellar/${p} ]]; then
+        if [[ $DONE_UPDATE -eq 0 ]]; then
+            brew update
+            DONE_UPDATE=1
+        fi
         log 1 "" "installing $p"
         brew install $p $args
     else
@@ -253,6 +268,10 @@ install_bsd_pkg()
     local args=$*
     pkg info -e $p
     if [[ $? -eq 1 ]]; then
+        if [[ $DONE_UPDATE -eq 0 ]]; then
+            sudo pkg update
+            DONE_UPDATE=1
+        fi
         log 1 "" "installing $p"
         sudo pkg install -U -y $p
     else
@@ -475,6 +494,7 @@ command_add()
     fetch_repo $target
     if [[ "$ERR" == "0" ]]; then
         read_one_config $target
+        install_packages
         link_target $target
         run_postinstall $target
     fi
@@ -516,6 +536,7 @@ unlink_one()
 
 command_link()
 {
+    install_packages
     if [[ $# -gt 0 ]]; then
         for t in $@; do
             link_one $t ""
