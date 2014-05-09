@@ -201,6 +201,24 @@ install_package()
     PKGS[${#PKGS[@]}]="$*"
 }
 
+ensure_update()
+{
+    if [[ $DONE_UPDATE -eq 0 ]]; then
+        case $OS in
+            "Linux")
+                sudo apt-get update
+                ;;
+            "Darwin")
+                brew update
+                ;;
+            "FreeBSD")
+                sudo pkg update
+                ;;
+        esac
+        DONE_UPDATE=1
+    fi
+}
+
 install_packages()
 {
     # indicate that we have not done a pkg db update
@@ -231,10 +249,7 @@ install_apt_pkg()
     local args=$*
     dpkg -l $p >/dev/null 2>&1
     if [[ $? -ne 0 ]]; then
-        if [[ $DONE_UPDATE -eq 0 ]]; then
-            sudo apt-get update
-            DONE_UPDATE=1
-        fi
+        ensure_update
         log 1 "" "installing $p"
         sudo apt-get install -y $p
     else
@@ -249,10 +264,7 @@ install_brew_pkg()
     shift
     local args=$*
     if [[ ! -d /usr/local/Cellar/${p} ]]; then
-        if [[ $DONE_UPDATE -eq 0 ]]; then
-            brew update
-            DONE_UPDATE=1
-        fi
+        ensure_update
         log 1 "" "installing $p"
         brew install $p $args
     else
@@ -268,10 +280,7 @@ install_bsd_pkg()
     local args=$*
     pkg info -e $p
     if [[ $? -eq 1 ]]; then
-        if [[ $DONE_UPDATE -eq 0 ]]; then
-            sudo pkg update
-            DONE_UPDATE=1
-        fi
+        ensure_update
         log 1 "" "installing $p"
         sudo pkg install -U -y $p
     else
@@ -610,6 +619,10 @@ command_boot()
     fi
     if [[ ! -d "${WD}/wsup" ]]; then
         log 1 "" "bootstrapping wsup!"
+        # ensure that we have git and curl:
+        install_package git
+        install_package curl
+        install_packages
         mkdir -p "${WD}/wsup/bin"
         local ws="${WD}/wsup/bin/wsup"
         curl -fsSL "${WSUP_BOOT}" > $ws
