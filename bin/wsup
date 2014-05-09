@@ -365,12 +365,10 @@ add_symlink()
     log 0 "$target" "link $targ -> $src"
     # if we have a good source, target
     if [[ ! -z "$src" && ! -z "$targ" ]]; then
-        if [[ ! -h $targ ]]; then
-            # if it's not a symlink already...
-            if [[ -r $targ ]]; then
-                # but is there, then remove it
-                rm -rf $targ
-            fi
+        t=$(readlink $targ)
+        if [[ "$t" != "$src" ]]; then
+            # targ link is incorrect
+            rm -rf $targ
             # and symlink it
             log 1 "$target" "link $src"
             ln -s $src $targ
@@ -397,19 +395,27 @@ verify_symlink()
     target=$1
     src=$2
     targ=$3
+    local result=0
     if [[ ! -e "$targ" ]]; then
         log 0 "$target" "$targ does not exist"
-        VERIFY=-1
+        result=-1
     elif [[ ! -h "$targ" ]]; then
         log 0 "$target" "$targ is not a link"
-        VERIFY=-1
+        result=-2
     else
         t=$(readlink $targ)
         if [[ "$t" != "$src" ]]; then
             log 0 "$target" "verify $targ link is incorrect"
-            VERIFY=-1
+            result=-3
         fi
     fi
+    if [[ $VERIFY -eq 0 ]]; then
+        VERIFY=$result
+    fi
+    if [[ $result -ne 0 ]]; then
+        log 0 "$target" "$targ is not a link to $src"
+    fi
+    return $result
 }
 
 ##
