@@ -160,13 +160,16 @@ also just a bash file that is executed just prior to executing ```wsup link``` (
 add```, which calls link). In addition to setting configuration, you can also use the
 ```wsup``` built-in ```add_package``` command to install packages. For example:
 
-    install_package "Linux" aspell
-    install_package "FreeBSD" aspell
-    install_package "Darwin" aspell
+    if [[ "$OS" == "Darwin" ]]; then
+        install_package aspell
+        install_package bash-completion
+    fi
 
-will install the "aspell" package on Linux, FreeBSD, and Darwin. ```install_package``` uses the
-OS underlying package manager to install the named packages (apt-get, pkg, and brew on Linux,
-FreeBSD, and Mac OS X respectively).
+will install the "aspell" and "bash-completion" packages on Darwin. ```install_package``` uses
+the OS underlying package manager to install the named packages (apt-get, pkg, and brew on
+Linux, FreeBSD, and Mac OS X respectively). See my
+[dotfiles repository](https://github.com/dcreemer/dotfiles/blob/master/.wsup/config) for more
+examples.
 
 Finally, each target may have a ```~/.wsup/<target>/.wsup/postinstall``` script. This must also
 be a bash script which is executed after a successful link of the named target. One example use
@@ -205,7 +208,7 @@ To bootstrap a completely new OS install, I do this:
 
 ```
 $ bash <$(https://raw.github.com/dcreemer/wsup/master/bin/wsup)
-$ wsup add dotfiles
+$ wsup add dotfiles dotemacs [<git-urls-to-any-private-repos> ...]
 ```
 
 (on FreeBSD use this instead)
@@ -214,10 +217,18 @@ $ wsup add dotfiles
 BOOT=yes curl -fsSL https://raw.github.com/dcreemer/wsup/master/bin/wsup | bash
 ```
 
-The .../dotfiles/.wsup/config file includes several ```add_target``` commands to enable easy
-installation of further private ```wsup``` repositories.
-
 (This assumes curl, bash, and git are already installed).
+
+The .wsup/config file can include several ```add_target``` commands to enable easy installation
+of further private ```wsup``` repositories. For example, adding:
+
+    add_target "project1" "git@github.com:somename/private-project-repo.git"
+
+will enable:
+
+     wsup add project1
+
+even though wsup knows nothing about the repository owner or name.
 
 ## See Also ##
 
@@ -229,8 +240,8 @@ examples of directory layout and configuration.
 
 Ideas for ```wsup``` can from many places, including:
 
-- https://github.com/technomancy/dotfiles
-- https://github.com/tobias/dotfiles
-- http://errtheblog.com/posts/89-huba-huba
+- [https://github.com/technomancy/dotfiles](https://github.com/technomancy/dotfiles)
+- [https://github.com/tobias/dotfiles](https://github.com/tobias/dotfiles)
+- [http://errtheblog.com/posts/89-huba-huba](http://errtheblog.com/posts/89-huba-huba)
 
 Also thanks to [@mattyblair](https://twitter.com/mattyblair) for review and comments.
