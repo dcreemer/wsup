@@ -50,7 +50,7 @@ REPO=""
 CMD=""
 
 # list of all legal commands
-commands="help add list link unlink boot"
+commands="help add list link unlink boot pull"
 
 # result of verification
 VERIFY=0
@@ -578,6 +578,38 @@ link_one()
 }
 
 ##
+## pull command -- git pull and git status in the given target repo
+##
+
+command_pull()
+{
+    if [[ $# -gt 0 ]]; then
+        for t in $@; do
+            pull_one $t
+        done
+    else
+        map_targets pull_one
+    fi
+}
+
+pull_one()
+{
+    local target=$1
+    get_target $target
+    if [[ ! -z $REPO ]]; then
+        cd "${WD}/$target"
+        if [[ -d ".git" ]]; then
+            echo "$target"
+            git pull
+            git status -s
+            echo ""
+        fi
+    else
+        echo "unknown target '$target'"
+    fi
+}
+
+##
 ## list command -- list all known targets, both installed and not
 ##
 
@@ -646,6 +678,7 @@ wsup link [target(s)]      - with no arguments, link all known targets. With arg
 wsup unlink [target(s)]    - same as link, but unlink
 wsup add <target> | <url>  - git clone the target or url, then link
 wsup list (or just "wsup") - show status for all known targets
+wsup pull [target(s)]      - with no arguments, 'git pull' all known targets. With arguments, just 'git pull' the given target(s)
 
 see https://github.com/dcreemer/wsup for detailed documentation
 
