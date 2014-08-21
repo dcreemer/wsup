@@ -207,7 +207,7 @@ then files in that directory will be linked by ```wsup``` on the appropriate ope
 To bootstrap a completely new OS install, I do this:
 
 ```
-$ bash <$(https://raw.github.com/dcreemer/wsup/master/bin/wsup)
+$ bash <$(curl -fsSL https://raw.github.com/dcreemer/wsup/master/bin/wsup)
 $ wsup add dotfiles dotemacs [<git-urls-to-any-private-repos> ...]
 ```
 
