@@ -262,13 +262,34 @@ install_brew_pkg()
     # install a brew-based package (if it doesn't exist)
     local p=$1
     shift
-    local args=$*
-    if [[ ! -d /usr/local/Cellar/${p} ]]; then
-        ensure_update
-        log 1 "" "installing $p"
-        brew install $p $args
+    if [[ "$p" == "cask" && "$*" != "" ]]; then
+        # install cask package
+        install_brew_cask_pkg $*
     else
-        log 0 "" "$p already installed"
+        local args=$*
+        if [[ ! -d /usr/local/Cellar/${p} ]]; then
+            ensure_update
+            log 1 "" "installing $p"
+            brew install $p $args
+        else
+            log 0 "" "$p already installed"
+        fi
+    fi
+}
+
+install_brew_cask_pkg()
+{
+    # install a brew-cask based package (if it doesn't exist)
+    local p=$1
+    shift
+    local args=$*
+    brew cask info "$p" | grep "Not installed" > /dev/null 2>&1
+    if [[ $? -eq 0 ]]; then
+        ensure_update
+        log 1 "" "installing cask $p"
+        brew cask install $p $args
+    else
+        log 0 "" "cask $p already installed"
     fi
 }
 
