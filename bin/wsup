@@ -50,7 +50,7 @@ REPO=""
 CMD=""
 
 # list of all legal commands
-commands="help add list link unlink boot pull"
+commands="help add list link install unlink boot pull"
 
 # result of verification
 VERIFY=0
@@ -573,7 +573,6 @@ unlink_one()
 
 command_link()
 {
-    install_packages
     if [[ $# -gt 0 ]]; then
         for t in $@; do
             link_one $t ""
@@ -596,6 +595,15 @@ link_one()
         log 1 $target "unknown"
         seterr 1
     fi
+}
+
+##
+## install command -- install all packages
+##
+
+command_install()
+{
+    install_packages
 }
 
 ##
@@ -697,8 +705,9 @@ usage: wsup [<command>] [target(s)]
 wsup help                  - show this help message
 wsup link [target(s)]      - with no arguments, link all known targets. With arguments, link the given target(s)
 wsup unlink [target(s)]    - same as link, but unlink
-wsup add <target> | <url>  - git clone the target or url, then link
+wsup add <target> | <url>  - git clone the target or url, then install all packages and link
 wsup list (or just "wsup") - show status for all known targets
+wsup install               - install all configured packages
 wsup pull [target(s)]      - with no arguments, 'git pull' all known targets. With arguments, just 'git pull' the given target(s)
 
 see https://github.com/dcreemer/wsup for detailed documentation
