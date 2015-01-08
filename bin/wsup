@@ -18,8 +18,10 @@ WD="$HOME/.wsup"
 # repo account name
 REPO_USER=${USER}
 
-# default URL prefix for repos:
-REPO_PREFIX="git@github.com:${REPO_USER}"
+# default URL prefix for repos. We default to https since this allows for
+# initial anonymous cloning. Change to git@... if you prefer that.
+REPO_PREFIX="https://${REPO_USER}@github.com/${REPO_USER}"
+# REPO_PREFIX="git@github.com:${REPO_USER}"
 
 # where to find the bootup wsup dir
 WSUP_BOOT="https://raw.github.com/dcreemer/wsup/master/bin/wsup"
