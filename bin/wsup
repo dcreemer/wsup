@@ -39,6 +39,9 @@ BASE_TARGET="dotfiles"
 
 # operating system name
 OS=`uname -s`
+if [[ "$OS" == "Linux" ]]; then
+    DIST=$(grep -e '^NAME=' /etc/os-release |sed -r 's/NAME="([a-zA-Z ]+)"/\1/')
+fi
 
 # the "map" of target => git repos URLs
 declare -a REPOS=( "xxx __ yyy" )
