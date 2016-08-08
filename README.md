@@ -204,20 +204,12 @@ then files in that directory will be linked by ```wsup``` on the appropriate ope
 
 ## Bootstrap ##
 
-To bootstrap a completely new OS install, I do this:
-
-```
-$ bash <$(curl -fsSL https://raw.github.com/dcreemer/wsup/master/bin/wsup)
-$ wsup add dotfiles dotemacs [<git-urls-to-any-private-repos> ...]
-```
-
-(on FreeBSD use this instead)
+To bootstrap a completely new OS install, first ensure that bash, curl, and git are installed. Then
+boot ```wsup```:
 
 ```
 BOOT=yes curl -fsSL https://raw.github.com/dcreemer/wsup/master/bin/wsup | bash
 ```
-
-(This assumes curl, bash, and git are already installed).
 
 The .wsup/config file can include several ```add_target``` commands to enable easy installation
 of further private ```wsup``` repositories. For example, adding:
