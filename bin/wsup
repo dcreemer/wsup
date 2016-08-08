@@ -650,8 +650,8 @@ pull_one()
 
 command_list()
 {
-    echo "TARGET           S REPOSITORY"
-    echo "---------------- - --------------------------------------------------------------------"
+    echo "TARGET             S REPOSITORY"
+    echo "------------------ - --------------------------------------------------------------------"
     map_targets "print_target_info"
 }
 
@@ -671,7 +671,7 @@ print_target_info()
     if [[ "$r" == "" ]]; then
         r="<unknown>"
     fi
-    printf "%-16s %s %s\n" "${target}" "$status" "$r"
+    printf "%-18s %s %s\n" "${target}" "$status" "$r"
 }
 
 ##
