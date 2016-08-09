@@ -157,39 +157,21 @@ add named wsup repositories to be added later.
 In addition to the ```.wsup/config``` file, each target may also include a
 ```~/.wsup/<target>/.wsup/config``` file that adds to and overrides the global file. This is
 also just a bash file that is executed just prior to executing ```wsup link``` (or ```wsup
-add```, which calls link). In addition to setting configuration, you can also use the
-```wsup``` built-in ```add_package``` command to install packages. For example:
-
-    if [[ "$OS" == "Darwin" ]]; then
-        install_package aspell
-        install_package bash-completion
-    fi
-
-will install the "aspell" and "bash-completion" packages on Darwin. ```install_package``` uses
-the OS underlying package manager to install the named packages (apt-get, pkg, and brew on
-Linux, FreeBSD, and Mac OS X respectively). See my
-[dotfiles repository](https://github.com/dcreemer/dotfiles/blob/master/.wsup/config) for more
-examples.
+add```, which calls link).
 
 Finally, each target may have a ```~/.wsup/<target>/.wsup/postinstall``` script. This must also
 be a bash script which is executed after a successful link of the named target. One example use
 may be installing additional software:
 
 ```bash
-OS=`uname -s`
 if [[ "$OS" == "Darwin" ]]; then
-    if [[ ! -d /Applications/Dropbox.app ]]; then
-        echo "[INSTALL] Dropbox"
-        curl -fsSL "https://www.dropbox.com/download?plat=mac" > ~/Downloads/dropbox.dmg
-        hdiutil attach ~/Downloads/dropbox.dmg
-        SAVEIFS=$IFS
-        IFS=$(echo -en "\n\b")
-        open "/Volumes/Dropbox Installer/Dropbox.app"
-        IFS=$SAVEIFS
-        rm -f ~/Downloads/dropbox.dmg
-    fi
+    brew install emacs
 fi
 ```
+
+See my
+[dotfiles repository](https://github.com/dcreemer/dotfiles/blob/master/.wsup/postinstall) for an
+example.
 
 ### OS Specific Directories ###
 
