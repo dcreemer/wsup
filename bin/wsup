@@ -46,9 +46,6 @@ fi
 # the "map" of target => git repos URLs
 declare -a REPOS=( "xxx __ yyy" )
 
-# list of pkgs to install
-declare -a PKGS=( )
-
 # the repository on which we are currently operating
 REPO=""
 
@@ -56,7 +53,7 @@ REPO=""
 CMD=""
 
 # list of all legal commands
-commands="help add list link install unlink boot pull"
+commands="help add list link unlink boot pull"
 
 # result of verification
 VERIFY=0
@@ -179,7 +176,6 @@ scan_targets()
     fi
 }
 
-
 map_targets()
 {
     local fn=$1
@@ -195,124 +191,6 @@ map_targets()
         fi
         ((idx++))
     done
-}
-
-##
-## pkg managment
-##
-
-install_package()
-{
-    # schedule a package to be installed
-    PKGS[${#PKGS[@]}]="$*"
-}
-
-ensure_update()
-{
-    if [[ $DONE_UPDATE -eq 0 ]]; then
-        case $OS in
-            "Linux")
-                sudo apt-get update
-                ;;
-            "Darwin")
-                brew update
-                ;;
-            "FreeBSD")
-                sudo pkg update
-                ;;
-        esac
-        DONE_UPDATE=1
-    fi
-}
-
-install_packages()
-{
-    # indicate that we have not done a pkg db update
-    DONE_UPDATE=0
-    idx=0
-    while [[ $idx -lt ${#PKGS[@]} ]]; do
-        local pkg="${PKGS[$idx]}"
-        case $OS in
-            "Linux")
-                install_apt_pkg $pkg
-                ;;
-            "Darwin")
-                install_brew_pkg $pkg
-                ;;
-            "FreeBSD")
-                install_bsd_pkg $pkg
-                ;;
-        esac
-        ((idx++))
-    done
-}
-
-install_apt_pkg()
-{
-    # install an apt-based package (if it doesn't exist)
-    local p=$1
-    shift
-    local args=$*
-    dpkg -l $p >/dev/null 2>&1
-    if [[ $? -ne 0 ]]; then
-        ensure_update
-        log 1 "" "installing $p"
-        sudo apt-get install -y $p
-    else
-        log 0 "" "$p already installed"
-    fi
-}
-
-install_brew_pkg()
-{
-    # install a brew-based package (if it doesn't exist)
-    local p=$1
-    shift
-    if [[ "$p" == "cask" && "$*" != "" ]]; then
-        # install cask package
-        install_brew_cask_pkg $*
-    else
-        local args=$*
-        if [[ ! -d /usr/local/Cellar/${p} ]]; then
-            ensure_update
-            log 1 "" "installing $p"
-            brew install $p $args
-        else
-            log 0 "" "$p already installed"
-        fi
-    fi
-}
-
-install_brew_cask_pkg()
-{
-    # install a brew-cask based package (if it doesn't exist)
-    local p=$1
-    shift
-    local args=$*
-    brew cask info "$p" | grep "Not installed" > /dev/null 2>&1
-    if [[ $? -eq 0 ]]; then
-        ensure_update
-        log 1 "" "installing cask $p"
-        brew cask install $p $args
-    else
-        log 0 "" "cask $p already installed"
-    fi
-}
-
-install_bsd_pkg()
-{
-    # install a freebsd pkg-based package (if it doesn't exist)
-    local p=$1
-    shift
-    local args=$*
-    pkg info -e $p
-    if [[ $? -eq 1 ]]; then
-        ensure_update
-        log 1 "" "installing $p"
-        sudo pkg install -U -y $p
-    else
-        log 0 "" "$p already installed"
-    fi
 }
 
 ##
@@ -604,15 +482,6 @@ link_one()
 }
 
 ##
-## install command -- install all packages
-##
-
-command_install()
-{
-    install_packages
-}
-
-##
 ## pull command -- git pull and git status in the given target repo
 ##
 
@@ -678,18 +547,32 @@ print_target_info()
 ## boot command
 ##
 
+ensure_requirements()
+{
+    local err=0
+    local reqs="git curl"
+    for x in $reqs; do
+        if [[ ! -x $(which ${x}) ]]; then
+            echo "missing ${x}"
+            err=1
+        fi
+    done
+    if [[ $err -ne 0 ]]; then
+        echo "Please install requirements first. Aborting."
+        exit 1
+    fi
+}
+
 command_boot()
 {
+    # ensure that we have git and curl:
+    ensure_requirements
     if [[ ! -d "${WD}" ]]; then
         mkdir ${WD}
         echo "# wsup config file for ${USER}" > "${WD}/config"
     fi
     if [[ ! -d "${WD}/wsup" ]]; then
         log 1 "" "bootstrapping wsup!"
-        # ensure that we have git and curl:
-        install_package git
-        install_package curl
-        install_packages
         mkdir -p "${WD}/wsup/bin"
         local ws="${WD}/wsup/bin/wsup"
         curl -fsSL "${WSUP_BOOT}" > $ws
@@ -713,7 +596,6 @@ wsup link [target(s)]      - with no arguments, link all known targets. With arg
 wsup unlink [target(s)]    - same as link, but unlink
 wsup add <target> | <url>  - git clone the target or url, then install all packages and link
 wsup list (or just "wsup") - show status for all known targets
-wsup install               - install all configured packages
 wsup pull [target(s)]      - with no arguments, 'git pull' all known targets. With arguments, just 'git pull' the given target(s)
 
 see https://github.com/dcreemer/wsup for detailed documentation
@@ -733,7 +615,7 @@ while getopts "v" opt; do
             ;;
         *)
             command_help
-            exit -1
+            exit 1
             ;;
     esac
 done
