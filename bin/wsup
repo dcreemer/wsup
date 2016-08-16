@@ -415,7 +415,6 @@ add_one()
     fetch_repo $target
     if [[ "$ERR" == "0" ]]; then
         read_one_config $target
-        install_packages
         link_target $target
         run_postinstall $target
     fi
